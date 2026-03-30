@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omni Audio Extractor</title>
+    <style>
+        body { background: #1e1e1e; color: #d4d4d4; font-family: sans-serif; padding: 20px; text-align: center; }
+        
+        /* Animasi transisi biar perubahan warnanya mulus */
+        .box { border: 2px dashed #555; padding: 30px; border-radius: 10px; margin-bottom: 20px; transition: all 0.3s ease; }
+        
+        /* Class baru pas video sukses dimasukin */
+        .box.success { border-color: #28a745; background: rgba(40, 167, 69, 0.05); }
+        
+        button { background: #007acc; color: white; border: none; padding: 12px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; }
+        button:hover { background: #005f9e; }
+        #status { margin-top: 15px; font-size: 14px; font-weight: bold; }
+        video { display: none; }
+        
+        .saweria-btn {
+            display: inline-block;
+            background: #f2a900;
+            color: #111;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 20px;
+            width: calc(100% - 40px);
+            box-sizing: border-box;
+            transition: 0.3s;
+        }
+        .saweria-btn:hover {
+            background: #ffc107;
+        }
+
+        /* Biar teks nama file ga bablas kalo kepanjangan */
+        #fileText { font-size: 14px; color: #888; margin-top: 15px; word-break: break-word; }
+        input[type="file"] { max-width: 100%; }
+    </style>
+</head>
+<body>
+
+    <h2>Audio Extractor ⚡</h2>
+    
+    <div class="box" id="uploadBox">
+        <input type="file" id="videoInput" accept="video/*">
+        <div id="fileText">pilih video yg mau di extract</div>
+    </div>
+
+    <button onclick="extractAudio()">EXTRACT MUSIK (WAV)</button>
+    <div id="status"></div>
+    
+    <a href="https://saweria.co/badag007" target="_blank" class="saweria-btn">☕ Traktir Kopi via Saweria</a>
+
+    <video id="v" controls></video>
+
+    <script>
+        const videoInput = document.getElementById('videoInput');
+        const fileText = document.getElementById('fileText');
+        const uploadBox = document.getElementById('uploadBox');
+
+        // Fungsi buat nangkap kejadian pas user milih file
+        videoInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                // Kalo ada file, ambil namanya
+                const fileName = this.files[0].name;
+                
+                // Ubah teks dan kasih warna hijau
+                fileText.innerHTML = `✅ <strong>${fileName}</strong> udah siap diextract!`;
+                fileText.style.color = "#28a745"; 
+                
+                // Tambahin class 'success' buat ubah warna kotak
+                uploadBox.classList.add('success'); 
+            } else {
+                // Kalo user batal milih file, balikin ke semula
+                fileText.innerHTML = "Pilih video Godhand atau Monyet Koplo lo bray";
+                fileText.style.color = "#888";
+                uploadBox.classList.remove('success');
+            }
+        });
+
+        async function extractAudio() {
+            const status = document.getElementById('status');
+            
+            if (videoInput.files.length === 0) return alert("Pilih videonya dulu bray!");
+
+            status.style.color = "#ffc107"; 
+            status.innerText = "Lagi proses... tunggu bentar...";
+            
+            const file = videoInput.files[0];
+            const arrayBuffer = await file.arrayBuffer();
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            try {
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                const wavBlob = bufferToWave(audioBuffer, audioBuffer.length);
+                
+                const url = URL.createObjectURL(wavBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "extracted_audio.wav";
+                a.click();
+                
+                status.style.color = "#28a745"; 
+                status.innerText = "Berhasil! Musik udah kedownload bray.";
+            } catch (e) {
+                status.style.color = "#dc3545"; 
+                status.innerText = "Gagal bray, format videonya mungkin aneh.";
+                console.error(e);
+            }
+        }
+
+        function bufferToWave(abuffer, len) {
+            let numOfChan = abuffer.numberOfChannels,
+                length = len * numOfChan * 2 + 44,
+                buffer = new ArrayBuffer(length),
+                view = new DataView(buffer),
+                channels = [], i, sample,
+                offset = 0,
+                pos = 0;
+
+            setUint32(0x46464952);                         setUint32(length - 8);                         setUint32(0x45564157);                         setUint32(0x20746d66);                         setUint32(16);                                 setUint16(1);                                  setUint16(numOfChan);
+            setUint32(abuffer.sampleRate);
+            setUint32(abuffer.sampleRate * 2 * numOfChan);
+            setUint16(numOfChan * 2);
+            setUint16(16);                                 setUint32(0x61746164);                         setUint32(length - pos - 4);                   
+            for(i=0; i<abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+
+            while(pos < length) {
+                for(i=0; i<numOfChan; i++) {             
+                    sample = Math.max(-1, Math.min(1, channels[i][offset])); 
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767)|0; 
+                    view.setInt16(pos, sample, true);          
+                    pos += 2;
+                }
+                offset++;                                     }
+
+            return new Blob([buffer], {type: "audio/wav"});
+
+            function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+            function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+        }
+    </script>
+</body>
+</html>
